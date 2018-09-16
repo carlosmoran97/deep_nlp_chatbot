@@ -184,3 +184,9 @@ def preprocess_targets(targets, word2int, batch_size):
     preprocessed_targets = tf.concat([left_side, right_side], 1)
     return preprocessed_targets
 
+# Creating the encoder RNN layer
+
+def encoder_rnn_layer(rnn_inputs, rnn_size, num_layers, keep_prob, sequence_length):
+    lstm = tf.contrib.rnn.BasicLSTMCell(rnn_size)
+    lstm_dropout = tf.contib.rnn.DropoutWrapper(lstm, input_keep_prob = keep_prob)
+    
