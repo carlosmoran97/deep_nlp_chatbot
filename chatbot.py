@@ -188,7 +188,7 @@ def preprocess_targets(targets, word2int, batch_size):
 
 def encoder_rnn(rnn_inputs, rnn_size, num_layers, keep_prob, sequence_length):
     lstm = tf.contrib.rnn.BasicLSTMCell(rnn_size)
-    lstm_dropout = tf.contib.rnn.DropoutWrapper(lstm, input_keep_prob = keep_prob)
+    lstm_dropout = tf.contrib.rnn.DropoutWrapper(lstm, input_keep_prob = keep_prob)
     encoder_cell = tf.contrib.rnn.MultiRNNCell([lstm_dropout] * num_layers)
     enconder_output, encoder_state = tf.nn.bidirectional_dynamic_rnn(cell_fw = encoder_cell,
                                                        cell_bw = encoder_cell,
@@ -216,7 +216,7 @@ def decode_training_set(encoder_state, decoder_cell, decoder_embedded_input, seq
     return output_function(decoder_output_dropout)
 
 # Decoding the test/validation set
-def decode_test_set(encoder_state, decoder_cell, decoder_embeddings_matrix, sos_id, eos_id, maximun_length, num_words , sequence_length, decoding_scope, output_function, keep_prob, batch_size):
+def decode_test_set(encoder_state, decoder_cell, decoder_embeddings_matrix, sos_id, eos_id, maximun_length, num_words , decoding_scope, output_function, keep_prob, batch_size):
     attention_states = tf.zeros([batch_size, 1, decoder_cell.output_size])
     attention_keys, attention_values, attention_score_function, attention_construct_function = tf.contrib.seq2seq.prepare_attention(attention_states, attention_option = 'bahdanau', num_units = decoder_cell.output_size)
     test_decoder_function = tf.contrib.seq2seq.attention_decoder_fn_inference(output_function,
@@ -240,7 +240,7 @@ def decode_test_set(encoder_state, decoder_cell, decoder_embeddings_matrix, sos_
 def decoder_rnn(decoder_embedded_input, decoder_embeddings_matrix, encoder_state, num_words, sequence_length, rnn_size, num_layers, word2int, keep_prob, batch_size):
     with tf.variable_scope("decoding") as decoding_scope:
         lstm = tf.contrib.rnn.BasicLSTMCell(rnn_size)
-        lstm_dropout = tf.contib.rnn.DropoutWrapper(lstm, input_keep_prob = keep_prob)
+        lstm_dropout = tf.contrib.rnn.DropoutWrapper(lstm, input_keep_prob = keep_prob)
         decoder_cell = tf.contrib.rnn.MultiRNNCell([lstm_dropout] * num_layers)
         weights = tf.truncated_normal_initializer(stddev = 0.1)
         biases = tf.zeros_initializer()
@@ -258,7 +258,7 @@ def decoder_rnn(decoder_embedded_input, decoder_embeddings_matrix, encoder_state
                                                    output_function,
                                                    keep_prob,
                                                    batch_size)
-        decoding_scope.reuse_varables()
+        decoding_scope.reuse_variables()
         test_predictions = decode_test_set(encoder_state,
                                            decoder_cell,
                                            decoder_embeddings_matrix,
@@ -306,3 +306,54 @@ decoding_embedding_size = 512
 learning_rate = 0.01
 learning_rate_decay = 0.9
 min_learning_rate = 0.0001
+keep_probability = 0.5
+
+# Creating the session
+
+tf.reset_default_graph()
+session = tf.InteractiveSession()
+
+
+# Loading the model inputs
+inputs, targets, lr, keep_prob = model_inputs()
+
+# Setting the sequence length
+sequence_length = tf.placeholder_with_default(25, None, name='sequence_length')
+
+# Getting the shape of the inputs tensor
+input_shape = tf.shape(inputs)
+
+
+# Getting the test and training predictions
+trainig_predictions, test_predictions = seq2seq_model(tf.reverse(inputs, [-1]),
+                                                                 targets,
+                                                                 keep_prob,
+                                                                 batch_size,
+                                                                 sequence_length,
+                                                                 len(answerswords2int),
+                                                                 len(questionswords2int),
+                                                                 encoding_embedding_size,
+                                                                 decoding_embedding_size,
+                                                                 rnn_size,
+                                                                 num_layers,
+                                                                 questionswords2int)
+
+
+# Setting up the Loss Error, the Optimizer, and Gradient Clipping
+with tf.name_scope("optimization"):
+    loss_error = tf.contrib.seq2seq.sequence_loss(trainig_predictions,
+                                                  targets,
+                                                  tf.ones([input_shape[0], sequence_length])
+                                                 )
+    optimizer = tf.train.AdamOptimizer(learning_rate)
+    gradients = optimizer.compute_gradients(loss_error)
+    clipped_gradients = [(tf.clip_by_value(grad_tensor, -5., 5.), grad_variable) for grad_tensor, grad_variable in gradients if grad_tensor is not None]
+    optimizer_gradient_clipping = optimizer.apply_gradients(clipped_gradients)
+
+# Padding the sequences with the <PAD> token
+# Question: ['Who', 'are', 'you']
+# Answer: ['<SOS>','I', 'am', 'a', 'bot', '.', '<SOS>']
+def apply_padding(batch_of_sequences, word2int):
+    max_sequence_length = max([len(sequence) for sequence in batch_of_sequences])
+    return [sequence + [word2int['<PAD>'] * (max_sequence_length - len(sequence))] for sequence in batch_of_sequences]
+
