@@ -355,7 +355,7 @@ with tf.name_scope("optimization"):
 # Answer: ['<SOS>','I', 'am', 'a', 'bot', '.', '<SOS>']
 def apply_padding(batch_of_sequences, word2int):
     max_sequence_length = max([len(sequence) for sequence in batch_of_sequences])
-    return [sequence + [word2int['<PAD>'] * (max_sequence_length - len(sequence))] for sequence in batch_of_sequences]
+    return [sequence + [word2int['<PAD>']] * (max_sequence_length - len(sequence)) for sequence in batch_of_sequences]
 
 # Splitting the data into batches of questions and answers
 def split_into_batches(questions, answers, batch_size):
